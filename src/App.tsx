@@ -1811,7 +1811,7 @@ ${categoryOptions}
       {/* 1. App Header */}
       <header className="px-5 py-5 pt-[max(1.25rem,env(safe-area-inset-top))] flex justify-between items-center bg-retro-bg/90 backdrop-blur-sm sticky top-0 z-40 border-b border-retro-text/10 max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold font-display tracking-tight flex items-center gap-2">
-          <span>用品管理系統</span>
+          <span>用品紀錄</span>
         </h1>
         <div className="flex gap-2">
           <button 
