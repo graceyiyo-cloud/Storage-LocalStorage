@@ -337,7 +337,6 @@ function MainApp() {
   const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set(['prod_1']));
 
   // --- Gemini API Loading States ---
-  const [diagnosticLog, setDiagnosticLog] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSearchingAi, setIsSearchingAi] = useState(false);
@@ -1431,6 +1430,33 @@ ${categoryOptions}
     setCurrentTab(formCategory); // Redirect to corresponding category tab
   };
 
+  const handleAddAnotherInstanceTrigger = (prod: Product) => {
+    setEditingProductId(prod.id);
+    setEditingInstanceId(null);
+    setIsEditingMaster(false);
+    setIsAddingInstanceToExisting(true);
+
+    setFormBrand(prod.brand);
+    setFormName(prod.name);
+    setFormCategory(prod.category);
+    setFormSubcategory(prod.subcategory);
+    setFormQty(1);
+    
+    setFormCapacity('');
+    setFormCapacityUnit(defaultCapacityUnit);
+    
+    setFormExpiry('');
+    setFormOpenedAt('');
+    setFormUsage('未開封');
+    setFormNotes('');
+    
+    setFormImage(prod.photo || null);
+    setFormThumbnail(prod.photoThumbnail || null);
+    setFormThreshold(prod.threshold?.toString() || '');
+    
+    setShowAddForm(true);
+  };
+
   const handleEditInstanceTrigger = (prod: Product, inst: ProductInstance) => {
     setEditingProductId(prod.id);
     setEditingInstanceId(inst.id);
@@ -1611,24 +1637,26 @@ ${categoryOptions}
     if (editingInstanceId && editingProductId) {
       askConfirmation(
         '永久刪除明細',
-        '確定要永久刪除此商品明細嗎？此操作無法復原。',
+        '確定要永遠刪除這個明細嗎？此動作無法復原。',
         () => {
-          const nextProducts = products.map(prod => {
-            if (prod.id === editingProductId) {
+          let targetProduct = products.find(p => p.id === editingProductId);
+          if (!targetProduct) return;
+
+          let nextProducts = products.map(p => {
+            if (p.id === editingProductId) {
               return {
-                ...prod,
-                instances: prod.instances.filter(i => i.id !== editingInstanceId)
+                ...p,
+                instances: p.instances.filter(i => i.id !== editingInstanceId)
               };
             }
-            return prod;
+            return p;
           }).filter(p => p.instances.length > 0);
 
           setProducts(nextProducts);
-          setShowAddForm(false);
-          clearForm();
-          showToast('明細已成功永久刪除！');
+          showToast('已刪除明細！');
+          closeForms();
 
-          // If detail modal is open for this product, sync or close
+          // Sync detail view if open
           if (selectedDetailProduct && selectedDetailProduct.id === editingProductId) {
             const updatedDetailedProduct = nextProducts.find(p => p.id === editingProductId);
             if (updatedDetailedProduct) {
@@ -1639,134 +1667,6 @@ ${categoryOptions}
           }
         }
       );
-    }
-  };
-
-  const handleDeleteInstanceDirect = (prodId: string, instId: string) => {
-    askConfirmation(
-      '永久刪除明細',
-      '確定要永久刪除此規格明細嗎？此操作無法復原。',
-      () => {
-        const nextProducts = products.map(prod => {
-          if (prod.id === prodId) {
-            return {
-              ...prod,
-              instances: prod.instances.filter(i => i.id !== instId)
-            };
-          }
-          return prod;
-        }).filter(p => p.instances.length > 0);
-
-        setProducts(nextProducts);
-        showToast('規格明細已成功永久刪除！');
-
-        // If detail modal is open, sync or close
-        if (selectedDetailProduct && selectedDetailProduct.id === prodId) {
-          const updatedDetailedProduct = nextProducts.find(p => p.id === prodId);
-          if (updatedDetailedProduct) {
-            setSelectedDetailProduct(updatedDetailedProduct);
-          } else {
-            setSelectedDetailProduct(null);
-          }
-        }
-      }
-    );
-  };
-
-  // Quick prepopulate form when adding another instance under a product
-  const handleAddAnotherInstanceTrigger = (prod: Product) => {
-    clearForm();
-    setEditingProductId(prod.id); // set this to ensure we know it belongs to an existing product
-    setIsAddingInstanceToExisting(true);
-    setIsEditingMaster(false);
-    setFormBrand(prod.brand);
-    setFormName(prod.name);
-    setFormCategory(prod.category);
-    setFormSubcategory(prod.subcategory);
-    setFormUsage('未開封');
-    setFormPhoto(prod.photo || '');
-    setFormPhotoThumbnail(prod.photoThumbnail || '');
-    
-    setShowAddForm(true);
-
-  };
-
-  const handleRecoverData = async () => {
-    try {
-      showToast('開始全面掃描資料庫...');
-      let log = '';
-      let recoveredItems: Product[] = [];
-      const addLog = (msg: string) => {
-        log += msg + '\n';
-        console.log(msg);
-      };
-      
-      addLog(`=== 資料診斷報告 ===`);
-      addLog(`User UID: ${user.uid}`);
-      
-      // 1. Local Storage
-      addLog(`[Local Storage 全面掃描]`);
-      for (let i = 0; i < localStorage.length; i++) {
-         const key = localStorage.key(i);
-         if (key) {
-             const val = localStorage.getItem(key);
-             addLog(`Key: ${key} (長度: ${val?.length})`);
-             if (val && val.includes('instances') && val.includes('category')) {
-                 try {
-                     const parsed = JSON.parse(val);
-                     if (Array.isArray(parsed)) {
-                         addLog(` -> 解析成功！發現 ${parsed.length} 筆產品資料`);
-                         recoveredItems.push(...parsed);
-                     }
-                 } catch(e) {}
-             }
-         }
-      }
-      
-      const lsData = localStorage.getItem('cosmetics_products') || localStorage.getItem('products');
-      if (lsData) {
-         try {
-            const parsed = JSON.parse(lsData);
-            addLog(`Local Storage 找到 ${parsed.length} 筆資料`);
-            recoveredItems.push(...parsed);
-         } catch(e) {}
-      } else {
-         addLog(`Local Storage 沒有資料`);
-      }
-
-      // Merge recovered
-      if (recoveredItems.length > 0) {
-         const mergedMap = new Map<string, Product>();
-         // Start with current state
-         products.forEach(p => mergedMap.set(p.id, p));
-         // Add recovered
-         recoveredItems.forEach(p => {
-            if (!mergedMap.has(p.id)) {
-               mergedMap.set(p.id, p);
-            } else {
-               const existing = mergedMap.get(p.id)!;
-               if (p.instances && existing.instances && p.instances.length > existing.instances.length) {
-                  mergedMap.set(p.id, p);
-               }
-            }
-         });
-         const finalProducts = Array.from(mergedMap.values());
-         addLog(`合併後總計: ${finalProducts.length} 筆資料 (原本畫面上有 ${products.length} 筆)`);
-         
-         if (finalProducts.length > products.length || JSON.stringify(finalProducts) !== JSON.stringify(products)) {
-            setProducts(finalProducts);
-            showToast(`已成功從歷史紀錄中還原合併資料！`);
-         } else {
-            showToast(`沒有找到更多遺失的資料。`);
-         }
-      } else {
-         showToast(`沒有找到任何歷史資料。`);
-      }
-      
-      setDiagnosticLog(log);
-    } catch (err: any) {
-      setDiagnosticLog(`發生未知的錯誤: ${err.message}`);
-      showToast('尋找資料時發生錯誤');
     }
   };
 
@@ -1912,7 +1812,6 @@ ${categoryOptions}
       <header className="px-5 py-5 pt-[max(1.25rem,env(safe-area-inset-top))] flex justify-between items-center bg-retro-bg/90 backdrop-blur-sm sticky top-0 z-40 border-b border-retro-text/10 max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold font-display tracking-tight flex items-center gap-2">
           <span>用品管理系統</span>
-          <span className="text-[10px] font-sans font-medium text-retro-text/50 bg-retro-text/5 px-1.5 py-0.5 rounded-md self-end mb-1">v2.0</span>
         </h1>
         <div className="flex gap-2">
           <button 
@@ -2522,7 +2421,8 @@ ${categoryOptions}
               <div className="space-y-4 animate-fade-in">
                 <h2 className="text-xl font-bold font-display flex items-center gap-2 text-retro-text mb-4">
                   <Settings className="w-5 h-5 text-retro-primary" />
-                  設定與分類管理
+                  <span>設定與分類管理</span>
+                  <span className="text-[10px] font-sans font-medium text-retro-text/50 bg-retro-text/5 px-1.5 py-0.5 rounded-md ml-auto">v2.0</span>
                 </h2>
                 <div className="grid grid-cols-1 gap-3">
                   <button onClick={() => setSettingsView('apikey')} className="p-4 bg-white border border-retro-text/10 rounded-2xl shadow-sm hover:border-retro-primary/50 transition-all flex items-center justify-between group cursor-pointer">
@@ -2585,11 +2485,6 @@ ${categoryOptions}
                     <ChevronRight className="w-5 h-5 text-retro-text/30 group-hover:text-retro-primary group-hover:translate-x-1 transition-all" />
                   </button>
                   
-                  <div className="mt-2">
-                    <button onClick={handleRecoverData} className="w-full p-4 bg-orange-50 border border-orange-100 rounded-2xl shadow-sm hover:border-orange-200 transition-all flex items-center justify-center group cursor-pointer">
-                      <span className="font-bold text-orange-600 text-sm">尋找遺失的資料 (資料救援)</span>
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
