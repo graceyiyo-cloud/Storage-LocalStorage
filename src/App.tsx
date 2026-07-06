@@ -1912,6 +1912,7 @@ ${categoryOptions}
       <header className="px-5 py-5 pt-[max(1.25rem,env(safe-area-inset-top))] flex justify-between items-center bg-retro-bg/90 backdrop-blur-sm sticky top-0 z-40 border-b border-retro-text/10 max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold font-display tracking-tight flex items-center gap-2">
           <span>用品管理系統</span>
+          <span className="text-[10px] font-sans font-medium text-retro-text/50 bg-retro-text/5 px-1.5 py-0.5 rounded-md self-end mb-1">v2.0</span>
         </h1>
         <div className="flex gap-2">
           <button 
@@ -3965,7 +3966,7 @@ function ProductCard({
               <span className="text-[10px] font-semibold text-retro-text/60 bg-stone-100 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm">
                 <span className="flex items-center gap-1">
                   <Package className="w-3 h-3 text-retro-primary" />
-                  {totalQty}
+                  {totalUnopenedQty}
                 </span>
                 {instances.filter(inst => inst.usage === '使用中').reduce((sum, inst) => sum + inst.qty, 0) > 0 && (
                   <>
